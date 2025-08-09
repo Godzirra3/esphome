@@ -1,6 +1,7 @@
 #include "dfrobot_sen0623.h"
 #include "esphome/core/log.h"
 
+#include "esphome/core/helpers.h"
 namespace esphome
 {
     namespace dfrobot_sen0623
@@ -8,6 +9,9 @@ namespace esphome
 
         static const char *TAG = "dfrobot_sen0623.component";
 
+        bool _switch_request_rate = false;
+
+        bool _d = true;
         void DfrobotSen0623Component::forge_packet(uint8_t control, uint8_t command, uint8_t *senData, uint16_t senLen)
         {
             std::vector<uint8_t> buffer;
@@ -37,7 +41,9 @@ namespace esphome
 
         void DfrobotSen0623Component::send_packet(uint8_t *packetData, size_t len)
         {
-            this->print_data(">>", packetData, len);
+            if (_d) {
+                this->print_data(">>", packetData, len);
+            }
             for (uint8_t i = 0; i < len; i++)
             {
                 while (!this->available())
@@ -76,7 +82,7 @@ namespace esphome
                 memcpy(packetData, buffer.data(), len);
             }
 
-            if (len > 0)
+            if (_d && len > 0)
             {
                 this->print_data("<<", packetData, len);
             }
@@ -105,35 +111,48 @@ namespace esphome
             ESP_LOGI(TAG, "WAITING FOR INIT");
             delay(1000);
 
-            uint8_t data[1];
-            data[0] = 0x0f;
-            this->forge_packet(0x01, 0x83, data, sizeof(data));
+                uint8_t data[1];
+                data[0] = 0x0f;
+            this->forge_packet(CON_01, CMD_INIT, data, 1);
+
+            // this->motion_sensor_->publish_state(1);
 
             uint8_t packetData[100];
-            uint8_t len = this->read_packet(packetData);
-            if (len < 5)
+            bool run = true;
+            while (run)
             {
-                this->mark_failed();
-                return;
+                uint8_t len = this->read_packet(packetData);
+
+                if (len > 5 && packetData[2] == CON_01 && packetData[3] == CMD_INIT && packetData[len - 2] != 0xf5)
+                {
+                    ESP_LOGI(TAG, "WE ARE IN BUSINESS");
+                    _d = false;
+                    return;
+                }
             }
+            this->mark_failed();
         }
 
         // getData(uint8_t con, uint8_t cmd, uint16_t len, uint8_t *senData, uint8_t *retData)
 
         void DfrobotSen0623Component::loop()
         {
+            //delay(10000000);
             // Request Hearth Rate
-            uint8_t data[1];
-            data[0] = 0x0f;
-            this->forge_packet(0x85, 0x82, data, sizeof(data));
+            if (_switch_request_rate)
+            {
+                uint8_t data[1];
+                data[0] = 0x0f;
+                this->forge_packet(0x85, 0x82, data, sizeof(data));
+            }
 
             uint8_t packetData[100]; // adjust size as needed
             uint8_t len = this->read_packet(packetData);
 
             if (len > 5)
             {
-                //this->print_data("**", packetData, len);
-                // Check packet validity
+                // this->print_data("**", packetData, len);
+                //  Check packet validity
                 uint8_t dataLen = ((uint16_t)packetData[4] << 8) | packetData[5];
                 uint8_t csum = 0;
                 for (uint8_t i = 0; i < 6 + dataLen; i++)
@@ -143,22 +162,41 @@ namespace esphome
                 csum = csum & 0xff;
                 if (packetData[0] == 0x53 && packetData[1] == 0x59 && packetData[len - 2] == 0x54 && packetData[len - 1] == 0x43 && csum == packetData[len - 3])
                 {
-                    ESP_LOGI(TAG, "-----");
-                    ESP_LOGI(TAG, "%02X %02X (%i)", packetData[2], packetData[3], dataLen);
                     uint8_t data[dataLen];
                     for (uint8_t i = 0; i < dataLen; i++)
                     {
                         data[i] = packetData[6 + i];
                     }
-                    this->print_data("**", data, dataLen);
-                    // ESP_LOGI(TAG, "CHECK_I: %02X", packetData[len-3]);
-                    // ESP_LOGI(TAG, "CHECK_C: %02X", csum);
-                    if (packetData[2] == 0x85 && packetData[3] == 0x82 && data[0] > 0)
+                    uint8_t con = packetData[2];
+                    uint8_t cmd = packetData[3];
+
+                    if (con == 0x85 && cmd == 0x82 && data[0] > 0)
                     {
-                        ESP_LOGI(TAG, "HRRRRR: %i", data[0]);
-                        delay(500);
+                        if (this->heart_rate_sensor_ != nullptr)
+                        {
+                            this->heart_rate_sensor_->publish_state(data[0]);
+                        }
                     }
-                    ESP_LOGI(TAG, "-----");
+                    else if (
+                        true || (con == 0x01 && cmd == 0x01) // 1
+                        || (con == 0x07 && cmd == 0x07)      // 1
+                        || (con == 0x80 && cmd == 0x02)      // 1
+                        || (con == 0x80 && cmd == 0x03)      // 1
+                        || (con == 0x80 && cmd == 0x04)      // 2
+                        || (con == 0x80 && cmd == 0x05)      // 6
+                    )
+                    {
+                        ;
+                    }
+                    else
+                    {
+                        ESP_LOGI(TAG, "-----");
+                        ESP_LOGI(TAG, "%02X %02X (%i)", con, cmd, dataLen);
+                        // ESP_LOGI(TAG, "CHECK_I: %02X", packetData[len-3]);
+                        // ESP_LOGI(TAG, "CHECK_C: %02X", csum);
+                        this->print_data("**", data, dataLen);
+                        ESP_LOGI(TAG, "-----");
+                    }
                 }
             }
         }
@@ -166,6 +204,39 @@ namespace esphome
         void DfrobotSen0623Component::dump_config()
         {
             ESP_LOGCONFIG(TAG, "DfrobotSen0623Component");
+        }
+
+        void DfrobotSen0623Component::set_switch_request_rate(bool val)
+        {
+            if (this->request_rate_switch_ != nullptr)
+                _switch_request_rate = val;
+            this->request_rate_switch_->publish_state(_switch_request_rate);
+        }
+
+        void DfrobotSen0623Component::set_switch_hp_led(bool val)
+        {
+            if (this->request_rate_switch_ != nullptr)
+            {
+                this->hp_led_switch_->publish_state(val);
+
+                uint8_t data[1];
+                if (val)
+                {
+                    data[0] = 1;
+                }
+                else
+                {
+                    data[0] = 0;
+                }
+                this->forge_packet(0x01, 0x03, data, sizeof(data)); // HP
+                // this->forge_packet(0x01, 0x04, data, sizeof(data)); // FALL
+            }
+        }
+
+        void DfrobotSen0623Component::cmd_reset()
+        {
+            uint8_t payload[1] = {0x0f};
+            this->forge_packet(0x01, 0x02, payload, sizeof(payload));
         }
 
     } // namespace dfrobot_sen0623

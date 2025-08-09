@@ -9,6 +9,8 @@ from esphome.const import (
 )
 DEPENDENCIES = ["uart"]
 
+CONF_DFROBOT_SEN0623_ID = "dfrobot_sen0623_id"
+
 dfrobot_sen0623_ns = cg.esphome_ns.namespace("dfrobot_sen0623")
 DfrobotSen0623Component = dfrobot_sen0623_ns.class_(
     "DfrobotSen0623Component", cg.Component, uart.UARTDevice
