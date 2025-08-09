@@ -11,6 +11,44 @@ namespace esphome
 
         bool _switch_request_rate = false;
 
+        void DfrobotSen0623Component::cmd_reset()
+        {
+            // uint8_t payload[1] = {0x0f};
+            // this->forge_packet(0x01, 0x02, payload, sizeof(payload));
+            this->request(2);
+            delay(1000);
+            this->request(5);
+        }
+
+        void DfrobotSen0623Component::request(uint8_t operation)
+        {
+            uint8_t data[1];
+            data[0] = {0x0f};
+            switch (operation)
+            {
+            case 0: // Sensor reset (startup?)
+                this->forge_packet(0x01, 0x02, data, 1);
+                break;            
+            case OP_INIT:
+                this->forge_packet(CON_01, CMD_INIT, data, 1);
+                break;
+            case OP_REQ_MODE:
+                this->forge_packet(0x02, 0xA8, data, 1);
+                break;
+            case 3: // request heart rate
+                this->forge_packet(0x85, 0x82, data, 1);
+                break;
+            case 4: // Sleep mode
+                data[0] = 0x02;
+                this->forge_packet(0x02, 0xA8, data, 1);
+                break;
+            case 5: // Falling mode
+                data[0] = 0x01;
+                this->forge_packet(0x02, 0xA8, data, 1);
+                break;
+            }
+        }
+
         bool _d = true;
         void DfrobotSen0623Component::forge_packet(uint8_t control, uint8_t command, uint8_t *senData, uint16_t senLen)
         {
@@ -41,7 +79,9 @@ namespace esphome
 
         void DfrobotSen0623Component::send_packet(uint8_t *packetData, size_t len)
         {
-            if (_d) {
+
+            if (true)
+            {
                 this->print_data(">>", packetData, len);
             }
             for (uint8_t i = 0; i < len; i++)
@@ -111,9 +151,7 @@ namespace esphome
             ESP_LOGI(TAG, "WAITING FOR INIT");
             delay(1000);
 
-                uint8_t data[1];
-                data[0] = 0x0f;
-            this->forge_packet(CON_01, CMD_INIT, data, 1);
+            this->request(OP_INIT);
 
             // this->motion_sensor_->publish_state(1);
 
@@ -138,8 +176,8 @@ namespace esphome
 
         void DfrobotSen0623Component::loop()
         {
-            //delay(10000000);
-            // Request Hearth Rate
+            // delay(10000000);
+            //  Request Hearth Rate
             if (_switch_request_rate)
             {
                 uint8_t data[1];
@@ -206,6 +244,8 @@ namespace esphome
                         || (con == 0x80 && cmd == 0x03)      // 1
                         || (con == 0x80 && cmd == 0x04)      // 2
                         || (con == 0x80 && cmd == 0x05)      // 6
+                        || (con == 0x81 && cmd == 0x02)      // 1
+                        || (con == 0x85 && cmd == 0x02)      // 1
                     )
                     {
                         ;
@@ -253,12 +293,6 @@ namespace esphome
                 this->forge_packet(0x01, 0x03, data, sizeof(data)); // HP
                 // this->forge_packet(0x01, 0x04, data, sizeof(data)); // FALL
             }
-        }
-
-        void DfrobotSen0623Component::cmd_reset()
-        {
-            uint8_t payload[1] = {0x0f};
-            this->forge_packet(0x01, 0x02, payload, sizeof(payload));
         }
 
     } // namespace dfrobot_sen0623

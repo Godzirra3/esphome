@@ -26,6 +26,9 @@
 namespace esphome {
 namespace dfrobot_sen0623 {
 
+#define OP_INIT 0x01
+#define OP_REQ_MODE 0x02
+
 #define CON_01 0x01
 #define CMD_INIT 0x83
 
@@ -37,6 +40,8 @@ class DfrobotSen0623Component : public uart::UARTDevice, public Component {
 
 
   public:
+    void request(uint8_t operation);
+
     void forge_packet(uint8_t control, uint8_t command, uint8_t *senData, uint16_t senLen);
 
     void send_packet(uint8_t *packetData, size_t len);
