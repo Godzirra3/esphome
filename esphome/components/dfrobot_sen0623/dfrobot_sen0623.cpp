@@ -8,6 +8,7 @@ std::pair<uint8_t, uint8_t> OP_RST_SENSOR = {0x01, 0x02};
 std::pair<uint8_t, uint8_t> OP_INIT = {0x01, 0x83};
 std::pair<uint8_t, uint8_t> OP_REQ_MODE = {0x02, 0xA8};
 std::pair<uint8_t, uint8_t> OP_REQ_HEART_RATE = {0x85, 0x82};
+std::pair<uint8_t, uint8_t> OP_REQ_BREATH_RATE = {0x81, 0x82};
 std::pair<uint8_t, uint8_t> OP_SET_MODE = {0x85, 0x82};
 uint8_t MODE_SLEEP = 0x02;
 uint8_t MODE_FALL = 0x01;
@@ -164,7 +165,11 @@ namespace esphome
                         if (data[0] > 0 && this->heart_rate_sensor_ != nullptr) {
                             this->heart_rate_sensor_->publish_state(data[0]);
                         }
-                    } else if (operation == OP_REQ_MODE) {
+                    } else if (operation == OP_REQ_BREATH_RATE) {
+                        if (data[0] > 0 && this->breath_rate_sensor_ != nullptr) {
+                            this->breath_rate_sensor_->publish_state(data[0]);
+                        }
+                    }else if (operation == OP_REQ_MODE) {
                         if (this->status_text_sensor_ != nullptr)
                         {
                             switch (data[0])
@@ -255,6 +260,7 @@ namespace esphome
             if (_switch_request_rate)
             {
                 this->request(OP_REQ_HEART_RATE);
+                this->request(OP_REQ_BREATH_RATE);
             }
         }
 
