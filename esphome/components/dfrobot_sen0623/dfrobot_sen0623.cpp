@@ -9,7 +9,8 @@ std::pair<uint8_t, uint8_t> OP_INIT = {0x01, 0x83};
 std::pair<uint8_t, uint8_t> OP_REQ_MODE = {0x02, 0xA8};
 std::pair<uint8_t, uint8_t> OP_REQ_HEART_RATE = {0x85, 0x82};
 std::pair<uint8_t, uint8_t> OP_REQ_BREATH_RATE = {0x81, 0x82};
-std::pair<uint8_t, uint8_t> OP_SET_MODE = {0x85, 0x82};
+std::pair<uint8_t, uint8_t> OP_REQ_HUMAN_PRESENCE = {0x80, 0x81};
+std::pair<uint8_t, uint8_t> OP_SET_MODE = {0x02, 0x08};
 uint8_t MODE_SLEEP = 0x02;
 uint8_t MODE_FALL = 0x01;
 
@@ -71,14 +72,19 @@ namespace esphome
         void DfrobotSen0623Component::send_packet(uint8_t *packetData, size_t len)
         {
 
-            if (true)
+            if (_d)
             {
                 this->print_data(">>", packetData, len);
             }
             for (uint8_t i = 0; i < len; i++)
             {
+                uint32_t init = millis();
                 while (!this->available())
                 {
+                    if (millis()>init+1000) {
+                        ESP_LOGE(TAG, "CANNOT SEND AFTER 1000ms");
+                        return;
+                    }
                 }
                 this->write_byte(packetData[i]);
             }
@@ -89,14 +95,23 @@ namespace esphome
             std::vector<uint8_t> buffer;
             uint8_t byte;
 
-            // Read bytes until '\n' delimiter or no more bytes available
-            while (this->available() && this->read_byte(&byte))
-            {
-                buffer.push_back(byte);
-                if (byte == '\n')
-                {
-                    break;
+            uint32_t timeout = millis() + 500;
+
+            // Read bytes until '\n' delimiter or no more bytes available (or timeout)
+            while (millis() < timeout) {
+                if (this->available()){
+                    if(this->read_byte(&byte)) {
+                        buffer.push_back(byte);
+                        if (byte == '\n')
+                        {
+                            break;
+                        }
+                    }
                 }
+            }
+
+            if (millis()>timeout) {
+                ESP_LOGE(TAG, "CANNOT READ AFTER 500ms");
             }
 
             // Copy data to packetData and return the length
@@ -165,11 +180,29 @@ namespace esphome
                         if (data[0] > 0 && this->heart_rate_sensor_ != nullptr) {
                             this->heart_rate_sensor_->publish_state(data[0]);
                         }
-                    } else if (operation == OP_REQ_BREATH_RATE) {
+                    } else 
+                    if (operation == OP_REQ_BREATH_RATE) {
                         if (data[0] > 0 && this->breath_rate_sensor_ != nullptr) {
                             this->breath_rate_sensor_->publish_state(data[0]);
                         }
-                    }else if (operation == OP_REQ_MODE) {
+                    } else 
+                    if (operation == OP_REQ_HUMAN_PRESENCE) {
+                        if (this->presence_sensor_ != nullptr) {
+                            switch (data[0])
+                            {
+                            case 0:
+                                this->presence_sensor_->publish_state(0);
+                                break;
+                            case 1:
+                                this->presence_sensor_->publish_state(1);
+                                break;
+                            default:
+                                ESP_LOGE(TAG, "INVALID PRESENCE: %02X", data[0]);
+                                break;
+                            }
+                        }
+                    } else 
+                    if (operation == OP_REQ_MODE) {
                         if (this->status_text_sensor_ != nullptr)
                         {
                             switch (data[0])
@@ -185,7 +218,8 @@ namespace esphome
                                 break;
                             }
                         }
-                    } else if (
+                    } else 
+                    if (
                         false 
                         || (operation.first == 0x01 && operation.second == 0x01) // 1
                         || (operation.first == 0x07 && operation.second == 0x07)      // 1
@@ -235,7 +269,6 @@ namespace esphome
             ESP_LOGI(TAG, "WAITING FOR INIT");
             delay(1000);
 
-            // this->motion_sensor_->publish_state(1);
             // Send init packet
             this->request(OP_INIT);
             uint8_t result = this->wait_for_packet(OP_INIT);
@@ -248,7 +281,7 @@ namespace esphome
                 // Reset sensor
                 this->request(OP_RST_SENSOR);
                 this->wait_for_packet(OP_RST_SENSOR);
-                _d = false;
+                //_d = false;
             } else {
                 this->mark_failed();
             }
@@ -260,16 +293,26 @@ namespace esphome
             if (_switch_request_rate)
             {
                 this->request(OP_REQ_HEART_RATE);
+                this->wait_for_packet(OP_REQ_HEART_RATE);
                 this->request(OP_REQ_BREATH_RATE);
+                this->wait_for_packet(OP_REQ_BREATH_RATE);
+                this->request(OP_REQ_HUMAN_PRESENCE);
+                this->wait_for_packet(OP_REQ_HUMAN_PRESENCE);
             }
         }
 
         void DfrobotSen0623Component::loop()
         {
+            if(!this->available()) {
+                //ESP_LOGE(TAG, "LOOP NOT AVAILABLE");
+                delay(100);
+                return;
+            }
             uint8_t packetData[100]; // adjust size as needed
             uint8_t len = this->read_packet(packetData);
 
             this->process_packet(packetData, len);
+            delay(50);
         }
 
         void DfrobotSen0623Component::dump_config()
