@@ -78,14 +78,6 @@ namespace esphome
             }
             for (uint8_t i = 0; i < len; i++)
             {
-                uint32_t init = millis();
-                while (!this->available())
-                {
-                    if (millis()>init+1000) {
-                        ESP_LOGE(TAG, "CANNOT SEND AFTER 1000ms");
-                        return;
-                    }
-                }
                 this->write_byte(packetData[i]);
             }
         }
@@ -95,25 +87,15 @@ namespace esphome
             std::vector<uint8_t> buffer;
             uint8_t byte;
 
-            uint32_t timeout = millis() + 500;
-
-            // Read bytes until '\n' delimiter or no more bytes available (or timeout)
-            while (millis() < timeout) {
-                if (this->available()){
-                    if(this->read_byte(&byte)) {
-                        buffer.push_back(byte);
-                        if (byte == '\n')
-                        {
-                            break;
-                        }
-                    }
+            // Read bytes until '\n' delimiter or no more bytes available
+            while (this->available() && this->read_byte(&byte))
+            {
+                buffer.push_back(byte);
+                if (byte == '\n')
+                {
+                    break;
                 }
             }
-
-            if (millis()>timeout) {
-                ESP_LOGE(TAG, "CANNOT READ AFTER 500ms");
-            }
-
             // Copy data to packetData and return the length
             size_t len = buffer.size();
             if (len > 0)
@@ -287,11 +269,22 @@ namespace esphome
             }
         }
 
+        bool _pending_update = false;
         // getData(uint8_t con, uint8_t cmd, uint16_t len, uint8_t *senData, uint8_t *retData)
         void DfrobotSen0623Component::update()
         {
             if (_switch_request_rate)
             {
+                _pending_update = true;
+            }
+        }
+
+        void DfrobotSen0623Component::loop()
+        {
+
+            // Pending reads
+            if (_pending_update) {
+                _pending_update = false;
                 this->request(OP_REQ_HEART_RATE);
                 this->wait_for_packet(OP_REQ_HEART_RATE);
                 this->request(OP_REQ_BREATH_RATE);
@@ -299,15 +292,7 @@ namespace esphome
                 this->request(OP_REQ_HUMAN_PRESENCE);
                 this->wait_for_packet(OP_REQ_HUMAN_PRESENCE);
             }
-        }
 
-        void DfrobotSen0623Component::loop()
-        {
-            if(!this->available()) {
-                //ESP_LOGE(TAG, "LOOP NOT AVAILABLE");
-                delay(100);
-                return;
-            }
             uint8_t packetData[100]; // adjust size as needed
             uint8_t len = this->read_packet(packetData);
 
