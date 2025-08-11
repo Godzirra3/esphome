@@ -32,7 +32,7 @@ namespace dfrobot_sen0623 {
 #define CON_01 0x01
 #define CMD_INIT 0x83
 
-class DfrobotSen0623Component : public uart::UARTDevice, public Component {
+class DfrobotSen0623Component : public uart::UARTDevice, public PollingComponent {
 #ifdef USE_SWITCH
   SUB_SWITCH(request_rate)
   SUB_SWITCH(hp_led)

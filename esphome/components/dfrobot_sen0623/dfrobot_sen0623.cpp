@@ -173,18 +173,16 @@ namespace esphome
         }
 
         // getData(uint8_t con, uint8_t cmd, uint16_t len, uint8_t *senData, uint8_t *retData)
+        void DfrobotSen0623Component::update()
+        {
+            if (_switch_request_rate)
+            {
+                this->request(3);
+            }
+            }
 
         void DfrobotSen0623Component::loop()
         {
-            // delay(10000000);
-            //  Request Hearth Rate
-            if (_switch_request_rate)
-            {
-                uint8_t data[1];
-                data[0] = 0x0f;
-                this->forge_packet(0x85, 0x82, data, sizeof(data));
-            }
-
             uint8_t packetData[100]; // adjust size as needed
             uint8_t len = this->read_packet(packetData);
 
