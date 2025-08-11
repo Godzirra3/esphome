@@ -25,7 +25,7 @@ namespace esphome
         {
             // uint8_t payload[1] = {0x0f};
             // this->forge_packet(0x01, 0x02, payload, sizeof(payload));
-            this->request(OP_REQ_MODE);
+            this->request(OP_RST_SENSOR);
             //delay(2000);
             //this->request(4);
         }
@@ -164,9 +164,7 @@ namespace esphome
                         if (data[0] > 0 && this->heart_rate_sensor_ != nullptr) {
                             this->heart_rate_sensor_->publish_state(data[0]);
                         }
-                    }
-
-                    if (operation == OP_REQ_MODE) {
+                    } else if (operation == OP_REQ_MODE) {
                         if (this->status_text_sensor_ != nullptr)
                         {
                             switch (data[0])
@@ -182,6 +180,28 @@ namespace esphome
                                 break;
                             }
                         }
+                    } else if (
+                        false 
+                        || (operation.first == 0x01 && operation.second == 0x01) // 1
+                        || (operation.first == 0x07 && operation.second == 0x07)      // 1
+                        || (operation.first == 0x80 && operation.second == 0x02)      // 1
+                        || (operation.first == 0x80 && operation.second == 0x03)      // 1
+                        || (operation.first == 0x80 && operation.second == 0x04)      // 2
+                        || (operation.first == 0x80 && operation.second == 0x05)      // 6
+                        || (operation.first == 0x81 && operation.second == 0x02)      // 1
+                        || (operation.first == 0x85 && operation.second == 0x02)      // 1
+                    )
+                    {
+                        ;
+                    }
+                    else
+                    {
+                        ESP_LOGI(TAG, "-----");
+                        ESP_LOGI(TAG, "%02X %02X (%i)", operation.first, operation.second, dataLen);
+                        // ESP_LOGI(TAG, "CHECK_I: %02X", packetData[len-3]);
+                        // ESP_LOGI(TAG, "CHECK_C: %02X", csum);
+                        this->print_data("**", data, dataLen);
+                        ESP_LOGI(TAG, "-----");
                     }
                 }
                 return true;
@@ -210,16 +230,19 @@ namespace esphome
             ESP_LOGI(TAG, "WAITING FOR INIT");
             delay(1000);
 
-            this->request(OP_INIT);
-
             // this->motion_sensor_->publish_state(1);
-
+            // Send init packet
+            this->request(OP_INIT);
             uint8_t result = this->wait_for_packet(OP_INIT);
             if (result != 0xf5) {
                 ESP_LOGI(TAG, "WE ARE IN BUSINESS");
                 this->status_text_sensor_->publish_state("NA");
+                // Request mode
                 this->request(OP_REQ_MODE);
                 this->wait_for_packet(OP_REQ_MODE);
+                // Reset sensor
+                this->request(OP_RST_SENSOR);
+                this->wait_for_packet(OP_RST_SENSOR);
                 _d = false;
             } else {
                 this->mark_failed();
@@ -241,80 +264,6 @@ namespace esphome
             uint8_t len = this->read_packet(packetData);
 
             this->process_packet(packetData, len);
-            return;
-            if (len > 5)
-            {
-                // this->print_data("**", packetData, len);
-                //  Check packet validity
-                uint8_t dataLen = ((uint16_t)packetData[4] << 8) | packetData[5];
-                uint8_t csum = 0;
-                for (uint8_t i = 0; i < 6 + dataLen; i++)
-                {
-                    csum += packetData[i];
-                }
-                csum = csum & 0xff;
-                if (packetData[0] == 0x53 && packetData[1] == 0x59 && packetData[len - 2] == 0x54 && packetData[len - 1] == 0x43 && csum == packetData[len - 3])
-                {
-                    uint8_t data[dataLen];
-                    for (uint8_t i = 0; i < dataLen; i++)
-                    {
-                        data[i] = packetData[6 + i];
-                    }
-                    uint8_t con = packetData[2];
-                    uint8_t cmd = packetData[3];
-
-                    if (con == 0x85 && cmd == 0x82 && data[0] > 0)
-                    {
-                        if (this->heart_rate_sensor_ != nullptr)
-                        {
-                            this->heart_rate_sensor_->publish_state(data[0]);
-                        }
-                    }
-                    
-                    if (con == 0x02 && cmd == 0xA8 && data[0] > 0)
-                    {
-                        if (this->status_text_sensor_ != nullptr)
-                        {
-                            switch (data[0])
-                            {
-                            case 1:
-                                this->status_text_sensor_->publish_state("fall");
-                                break;
-                            case 2:
-                                this->status_text_sensor_->publish_state("sleep");
-                                break;
-                            default:
-                                this->status_text_sensor_->publish_state("error");
-                                break;
-                            }
-                        }
-                    }
-                    
-                    if (
-                        false 
-                        || (con == 0x01 && cmd == 0x01) // 1
-                        || (con == 0x07 && cmd == 0x07)      // 1
-                        || (con == 0x80 && cmd == 0x02)      // 1
-                        || (con == 0x80 && cmd == 0x03)      // 1
-                        || (con == 0x80 && cmd == 0x04)      // 2
-                        || (con == 0x80 && cmd == 0x05)      // 6
-                        || (con == 0x81 && cmd == 0x02)      // 1
-                        || (con == 0x85 && cmd == 0x02)      // 1
-                    )
-                    {
-                        ;
-                    }
-                    else
-                    {
-                        ESP_LOGI(TAG, "-----");
-                        ESP_LOGI(TAG, "%02X %02X (%i)", con, cmd, dataLen);
-                        // ESP_LOGI(TAG, "CHECK_I: %02X", packetData[len-3]);
-                        // ESP_LOGI(TAG, "CHECK_C: %02X", csum);
-                        this->print_data("**", data, dataLen);
-                        ESP_LOGI(TAG, "-----");
-                    }
-                }
-            }
         }
 
         void DfrobotSen0623Component::dump_config()
