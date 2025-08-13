@@ -52,6 +52,7 @@ class DfrobotSen0623Component : public uart::UARTDevice, public PollingComponent
     void set_breath_rate_sensor(sensor::Sensor *rate_sensor) { breath_rate_sensor_ = rate_sensor; }
     // text sensor 
     void set_status_text_sensor(text_sensor::TextSensor *status_text_sensor) { status_text_sensor_ = status_text_sensor; }
+    void set_movement_text_sensor(text_sensor::TextSensor *movement_text_sensor) { movement_text_sensor_ = movement_text_sensor; }
     // binary_sensor
     void set_presence_binary_sensor(binary_sensor::BinarySensor *presence_sensor) { presence_sensor_ = presence_sensor; }
     // button
@@ -72,6 +73,7 @@ class DfrobotSen0623Component : public uart::UARTDevice, public PollingComponent
     binary_sensor::BinarySensor *presence_sensor_{nullptr};
 
     text_sensor::TextSensor *status_text_sensor_{nullptr};
+    text_sensor::TextSensor *movement_text_sensor_{nullptr};
 
     button::Button *reset_button_{nullptr};
 };

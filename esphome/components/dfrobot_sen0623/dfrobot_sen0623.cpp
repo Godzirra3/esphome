@@ -10,6 +10,7 @@ std::pair<uint8_t, uint8_t> OP_REQ_MODE = {0x02, 0xA8};
 std::pair<uint8_t, uint8_t> OP_REQ_HEART_RATE = {0x85, 0x82};
 std::pair<uint8_t, uint8_t> OP_REQ_BREATH_RATE = {0x81, 0x82};
 std::pair<uint8_t, uint8_t> OP_REQ_HUMAN_PRESENCE = {0x80, 0x81};
+std::pair<uint8_t, uint8_t> OP_REQ_HUMAN_MOVEMENT = {0x80, 0x82};
 std::pair<uint8_t, uint8_t> OP_SET_MODE = {0x02, 0x08};
 uint8_t MODE_SLEEP = 0x02;
 uint8_t MODE_FALL = 0x01;
@@ -122,7 +123,8 @@ namespace esphome
         }
 
         uint8_t DfrobotSen0623Component::wait_for_packet(std::pair<uint8_t, uint8_t> operation) {
-            uint8_t ths = 500;
+            // I think this can be a lot lower
+            uint8_t ths = 128;
             while(ths > 0) {
                 //ESP_LOGI(TAG, "%s", ths);
                 uint8_t packetData[100]; // adjust size as needed
@@ -184,6 +186,25 @@ namespace esphome
                                 break;
                             default:
                                 ESP_LOGE(TAG, "INVALID PRESENCE: %02X", data[0]);
+                                break;
+                            }
+                        }
+                    } else 
+                    if (operation == OP_REQ_HUMAN_MOVEMENT) {
+                        if (this->presence_sensor_ != nullptr) {
+                            switch (data[0])
+                            {
+                            case 0:
+                                this->movement_text_sensor_->publish_state("none");
+                                break;
+                            case 1:
+                                this->movement_text_sensor_->publish_state("still");
+                                break;
+                            case 2:
+                                this->movement_text_sensor_->publish_state("active");
+                                break;
+                            default:
+                                ESP_LOGE(TAG, "INVALID MOVEMENT: %02X", data[0]);
                                 break;
                             }
                         }
@@ -277,6 +298,7 @@ namespace esphome
             if (result != 0xf5) {
                 ESP_LOGI(TAG, "WE ARE IN BUSINESS");
                 this->status_text_sensor_->publish_state("NA");
+                this->movement_text_sensor_->publish_state("NA");
                 // Request mode
                 this->request(OP_REQ_MODE);
                 this->wait_for_packet(OP_REQ_MODE);
@@ -311,6 +333,8 @@ namespace esphome
                 this->wait_for_packet(OP_REQ_BREATH_RATE);
                 this->request(OP_REQ_HUMAN_PRESENCE);
                 this->wait_for_packet(OP_REQ_HUMAN_PRESENCE);
+                this->request(OP_REQ_HUMAN_MOVEMENT);
+                this->wait_for_packet(OP_REQ_HUMAN_MOVEMENT);
             }
 
             uint8_t packetData[100]; // adjust size as needed
