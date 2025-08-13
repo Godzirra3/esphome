@@ -15,6 +15,7 @@ CONF_HEART_RATE = "heart_rate"
 CONF_BREATH_RATE = "breath_rate"
 
 CONF_HUMAN_DISTANCE = "human_distance"
+CONF_HUMAN_MOVE_RANGE = "human_move_range"
 
 CONFIG_SCHEMA = (
     cv.Schema(
@@ -38,6 +39,10 @@ CONFIG_SCHEMA = (
                 device_class=DEVICE_CLASS_EMPTY,
                 state_class=STATE_CLASS_MEASUREMENT,
             ),
+            cv.Optional(CONF_HUMAN_MOVE_RANGE): sensor.sensor_schema(
+                device_class=DEVICE_CLASS_EMPTY,
+                state_class=STATE_CLASS_MEASUREMENT,
+            ),
         }
     )
 )
@@ -57,3 +62,7 @@ async def to_code(config):
     if human_distance := config.get(CONF_HUMAN_DISTANCE):
         sens = await sensor.new_sensor(human_distance)
         cg.add(parent.set_human_distance_sensor(sens))
+
+    if human_move_range := config.get(CONF_HUMAN_MOVE_RANGE):
+        sens = await sensor.new_sensor(human_move_range)
+        cg.add(parent.set_human_move_range_sensor(sens))
