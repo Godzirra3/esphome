@@ -11,6 +11,7 @@ std::pair<uint8_t, uint8_t> OP_REQ_HEART_RATE = {0x85, 0x82};
 std::pair<uint8_t, uint8_t> OP_REQ_BREATH_RATE = {0x81, 0x82};
 std::pair<uint8_t, uint8_t> OP_REQ_HUMAN_PRESENCE = {0x80, 0x81};
 std::pair<uint8_t, uint8_t> OP_REQ_HUMAN_MOVEMENT = {0x80, 0x82};
+std::pair<uint8_t, uint8_t> OP_REQ_HUMAN_DISTANCE = {0x80, 0x84};
 std::pair<uint8_t, uint8_t> OP_SET_MODE = {0x02, 0x08};
 uint8_t MODE_SLEEP = 0x02;
 uint8_t MODE_FALL = 0x01;
@@ -191,7 +192,7 @@ namespace esphome
                         }
                     } else 
                     if (operation == OP_REQ_HUMAN_MOVEMENT) {
-                        if (this->presence_sensor_ != nullptr) {
+                        if (this->movement_text_sensor_ != nullptr) {
                             switch (data[0])
                             {
                             case 0:
@@ -207,6 +208,11 @@ namespace esphome
                                 ESP_LOGE(TAG, "INVALID MOVEMENT: %02X", data[0]);
                                 break;
                             }
+                        }
+                    } else 
+                    if (operation == OP_REQ_HUMAN_DISTANCE) {
+                        if (this->human_distance_sensor_ != nullptr) {
+                            this->human_distance_sensor_->publish_state(data[0] << 8 | data[1]);
                         }
                     } else 
                     if (operation == OP_REQ_MODE) {
@@ -328,13 +334,15 @@ namespace esphome
             if (_pending_update) {
                 _pending_update = false;
                 this->request(OP_REQ_HEART_RATE);
-                this->wait_for_packet(OP_REQ_HEART_RATE);
+                //this->wait_for_packet(OP_REQ_HEART_RATE);
                 this->request(OP_REQ_BREATH_RATE);
-                this->wait_for_packet(OP_REQ_BREATH_RATE);
+                //this->wait_for_packet(OP_REQ_BREATH_RATE);
                 this->request(OP_REQ_HUMAN_PRESENCE);
-                this->wait_for_packet(OP_REQ_HUMAN_PRESENCE);
+                //this->wait_for_packet(OP_REQ_HUMAN_PRESENCE);
                 this->request(OP_REQ_HUMAN_MOVEMENT);
-                this->wait_for_packet(OP_REQ_HUMAN_MOVEMENT);
+                //this->wait_for_packet(OP_REQ_HUMAN_MOVEMENT);
+                this->request(OP_REQ_HUMAN_DISTANCE);
+                //this->wait_for_packet(OP_REQ_HUMAN_DISTANCE);
             }
 
             uint8_t packetData[100]; // adjust size as needed
