@@ -12,3 +12,10 @@ select:
     mode:
       name: Mode
       initial_option: fall
+
+binary_sensor:
+  - platform: dfrobot_sen0623
+    dfrobot_sen0623_id: mmwave
+    fall_detected:
+      name: Fall Detected
+

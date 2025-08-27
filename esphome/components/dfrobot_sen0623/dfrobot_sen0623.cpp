@@ -12,6 +12,7 @@ std::pair<uint8_t, uint8_t> OP_REQ_HUMAN_PRESENCE = {0x80, 0x81};
 std::pair<uint8_t, uint8_t> OP_REQ_HUMAN_MOVEMENT = {0x80, 0x82};
 std::pair<uint8_t, uint8_t> OP_REQ_HUMAN_MOVE_RANGE = {0x80, 0x83};
 std::pair<uint8_t, uint8_t> OP_REQ_HUMAN_DISTANCE = {0x80, 0x84};
+std::pair<uint8_t, uint8_t> OP_REQ_FALL_DETECTED = {0x80, 0x85};
 std::pair<uint8_t, uint8_t> OP_SET_MODE = {0x02, 0x08};
 
 namespace esphome {
@@ -187,6 +188,10 @@ bool DfrobotSen0623Component::process_packet(uint8_t *packetData, size_t len) {
         if (this->human_move_range_sensor_ != nullptr) {
           this->human_move_range_sensor_->publish_state(data[0]);
         }
+      } else if (operation == OP_REQ_FALL_DETECTED) {
+        if (this->fall_detected_binary_sensor_ != nullptr) {
+          this->fall_detected_binary_sensor_->publish_state(data[0] != 0);
+        }
       } else if (operation == OP_REQ_MODE) {
         if (this->status_text_sensor_ != nullptr) {
           switch (data[0]) {
@@ -310,6 +315,10 @@ void DfrobotSen0623Component::loop() {
     // this->wait_for_packet(OP_REQ_HUMAN_DISTANCE);
     this->request(OP_REQ_HUMAN_MOVE_RANGE);
     // this->wait_for_packet(OP_REQ_HUMAN_MOVE_RANGE);
+    if (this->status_text_sensor_ != nullptr && this->status_text_sensor_->state == "fall") {
+      this->request(OP_REQ_FALL_DETECTED);
+      // this->wait_for_packet(OP_REQ_FALL_DETECTED);
+    }
   }
 
   uint8_t packetData[100];  // adjust size as needed
